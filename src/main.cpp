@@ -18,6 +18,7 @@
 #define SEN2 35
 
 Button btnUSER(BTN, INPUT_PULLUP);
+GStepper<STEPPER2WIRE> stepper(1600, PUL, DIR, ENA); // драйвер step-dir + пин enable
 
 String fw = "0.2";
 
@@ -58,10 +59,28 @@ void setup()
 
   pinMode(SEN1, INPUT_PULLUP);
   pinMode(SEN2, INPUT_PULLUP);
+
+  stepper.setMaxSpeed(800);
+  stepper.setAcceleration(300);
+  stepper.setRunMode(FOLLOW_POS);
+  stepper.disable();
+  stepper.stop();
+  stepper.reset();
+
+  // stepper.setTarget(360);
 }
 
 void loop()
 {
+  // просто крутим туды-сюды
+  // if (!stepper.tick())
+  // {
+  //   static bool dir;
+  //   dir = !dir;
+  //   stepper.setTarget(dir ? -1024 : 1024);
+  // }
+  stepper.tick();
+
   ButtonHandler();
   task_1000();
 }
@@ -80,6 +99,8 @@ void ButtonHandler()
     if (btnUSER.hasClicks(1))
     {
       Serial.println("RL4 ON");
+      stepper.setTargetDeg(360);
+      stepper.enable();
       if (state != 0b00001000)
       {
         state = 0b00001000;
@@ -124,13 +145,13 @@ void task_1000()
     sprintf(msg, "Timer 1000");
     Serial.println(msg);
 
-    if (!digitalRead(SEN1))
+    if (digitalRead(SEN1))
     {
       sprintf(msg, "SENSOR_ 1 Activate");
       Serial.println(msg);
     }
 
-    if (!digitalRead(SEN2))
+    if (digitalRead(SEN2))
     {
       sprintf(msg, "SENSOR_ 2 Activate");
       Serial.println(msg);
@@ -142,10 +163,14 @@ void task_1000()
     {
       count++;
       Serial.println(count);
+
       if (count == 10)
       {
         count = 0;
         state = 0b00000000;
+        stepper.disable();
+        stepper.stop();
+        stepper.reset();
       }
     }
   }
@@ -170,6 +195,7 @@ void SetStateRelay(uint8_t st)
     digitalWrite(RL2, LOW);
     break;
   case 0b00000100:
+    stepper.enable();
     digitalWrite(RL3, LOW);
     digitalWrite(RL4, HIGH);
     break;
