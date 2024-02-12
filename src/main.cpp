@@ -126,10 +126,7 @@ void TableConroller()
     if (digitalRead(SEN1))
     {
       FState.HS1 = 1;
-      stepper.setAcceleration(3000);
-      stepper.setSpeedDeg(800);
-      stepper.enable();
-
+      SetStateDrive(forward);
       Serial.println("S1: ON");
     }
 
@@ -143,17 +140,13 @@ void TableConroller()
         Serial.println("S2: ON");
         FState.HS1 = 0;
         FState.HS2 = 1;
-        stepper.disable();
-        stepper.stop();
-        stepper.reset();
+        SetStateDrive(disable);
       }
     }
     // Started, if 2 Hall sensor in Home Position
     if (FState.HS2)
     {
-      stepper.setAcceleration(3000);
-      stepper.setSpeedDeg(800);
-      stepper.enable();
+      SetStateDrive(forward);
 
       delay(PD);
       now = millis();
@@ -162,8 +155,8 @@ void TableConroller()
       {
         stepper.tick();
       }
-      
       SetStateDrive(disable);
+      
       // Moved Four Driver (Item 4)
       delay(PD);
       Serial.println("Driver 4 UP");
@@ -171,17 +164,17 @@ void TableConroller()
       delay(TimM2);
       SetStateRelay(Act_OFF);
 
+      SetStateDrive(back);
+
       // while Hall Sensor is not HOME position (item 7)
-      stepper.setSpeedDeg(-800);
-      stepper.enable();
       while (!digitalRead(SEN2))
       {
         stepper.tick();
       }
       FState.HS2 = 0;
-
       SetStateDrive(disable);
     }
+
     FState.TableNS = NONE;
     Serial.println("Driver OFF");
     Serial.println("Table Opening Compleated.");
@@ -251,15 +244,20 @@ void SetStateDrive(uint8_t state)
     /* code */
     break;
   case back:
-    /* code */
+    stepper.setAcceleration(3000);
+    stepper.setSpeedDeg(-800);
+    stepper.enable();
     break;
   case forward:
-    /* code */
+    stepper.setAcceleration(3000);
+    stepper.setSpeedDeg(800);
+    stepper.enable();
     break;
   default:
     break;
   }
 }
+
 void task_1000()
 {
   static uint32_t timer_1000 = 0;
