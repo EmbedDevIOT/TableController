@@ -8,7 +8,7 @@
 Button btnUSER(BTN, INPUT_PULLUP);
 GStepper<STEPPER2WIRE> stepper(1600, PUL, DIR, ENA); // драйвер step-dir + пин enable
 
-String fw = "0.6";
+String fw = "0.7";
 
 enum ActState
 {
@@ -156,7 +156,7 @@ void TableConroller()
         stepper.tick();
       }
       SetStateDrive(disable);
-      
+
       // Moved Four Driver (Item 4)
       delay(PD);
       Serial.println("Driver 4 UP");
@@ -179,53 +179,68 @@ void TableConroller()
     Serial.println("Driver OFF");
     Serial.println("Table Opening Compleated.");
   }
-  else if (FState.TableNS == CLOSE && digitalRead(SEN2)) // Closing
+  // Closing
+  else if (FState.TableNS == CLOSE && digitalRead(SEN2)) 
   {
     FState.Block = true; // Blocked User Btn
     Serial.println("Table Closing Starting");
-    // First delay waiting (3s) p.2
+    // Item 2. First delay waiting (3s)
     delay(FD);
     // If Hall sensor HS2 in HOME position, Start Servo
     if (digitalRead(SEN2))
     {
-      FState.HS2 = 1;
-      stepper.setAcceleration(3000);
-      stepper.setSpeedDeg(800);
-      stepper.enable();
       Serial.println("S2: ON");
-
+      FState.HS2 = 1;
+      SetStateDrive(forward);
+    }
+    if (FState.HS2)
+    {
       now = millis();
-      // The motor Nema 23 moves slightly forward
+      // Item 3. The motor Nema 23 moves slightly forward
       while (millis() - now < 3000)
       {
         stepper.tick();
       }
+      FState.HS2 = 0;
+      SetStateDrive(disable);
     }
 
-    FState.HS2 = 0;
-
-    SetStateDrive(disable);
-
     delay(PD);
+
+    // Item 4. Moved Four Driver.
     Serial.println("Driver 4 Down");
     SetStateRelay(Act1_DWN);
     delay(TimM2);
     SetStateRelay(Act_OFF);
-
+    // Item 5. The driver Nema 23 moves slightly backward
+    SetStateDrive(back);
     while (!digitalRead(SEN2))
     {
       stepper.tick();
     }
+    // Item 6. Driver Nema 23 moves slightly backward to HAll sensor 1
+    while (!digitalRead(SEN1))
+    {
+      stepper.tick();
+    }
+    SetStateDrive(disable);
+    delay(PD);
+    // Item 7. Three Drivers run
+    Serial.println("Driver 1-3 DWN");
+    // Three drivers moving Forward (item 3)
+    SetStateRelay(Act2_DWN);
+    delay(TimM1);
+    SetStateRelay(Act_OFF);
 
     FState.TableNS = NONE;
     Serial.println("Driver OFF");
     Serial.println("Table Closing Compleated.");
   }
+  // Disable
   else
   {
     FState.TableNS = NONE;
     FState.Block = false;
-
     SetStateDrive(disable);
     SetStateRelay(Act_OFF);
   }
@@ -258,20 +273,6 @@ void SetStateDrive(uint8_t state)
   }
 }
 
-void task_1000()
-{
-  static uint32_t timer_1000 = 0;
-
-  char msg[30];
-
-  if (millis() - timer_1000 > 1000)
-  {
-    timer_1000 = millis();
-    sprintf(msg, "T: 1000");
-    Serial.println(msg);
-  }
-}
-
 void SetStateRelay(uint8_t st)
 {
   switch (st)
@@ -300,5 +301,19 @@ void SetStateRelay(uint8_t st)
     digitalWrite(RL4, LOW);
   default:
     break;
+  }
+}
+
+void task_1000()
+{
+  static uint32_t timer_1000 = 0;
+
+  char msg[30];
+
+  if (millis() - timer_1000 > 1000)
+  {
+    timer_1000 = millis();
+    sprintf(msg, "T: 1000");
+    Serial.println(msg);
   }
 }
