@@ -1,35 +1,14 @@
 #include <Arduino.h>
 #include <EncButton.h>
 #include <GyverStepper.h>
+#include "TableController.h"
 
 #define speed 115200
-#define TimM1 10000
-#define TimM2 7000
-
-#define ENA 12
-#define DIR 14
-#define PUL 27
-
-#define RL1 18
-#define RL2 5
-#define RL3 17
-#define RL4 16
-
-#define BTN 33
-#define SEN1 32
-#define SEN2 35
 
 Button btnUSER(BTN, INPUT_PULLUP);
 GStepper<STEPPER2WIRE> stepper(1600, PUL, DIR, ENA); // драйвер step-dir + пин enable
 
-String fw = "0.5";
-
-enum state
-{
-  NONE,
-  OPEN,
-  CLOSE
-};
+String fw = "0.6";
 
 enum ActState
 {
@@ -42,13 +21,13 @@ enum ActState
 
 struct FLAG
 {
-  bool ACT1 = 0;
-  bool ACT2 = 0;
-  bool HS1 = 0;
-  bool HS2 = 0;
-  uint8_t Table = 0;
-};
-struct FLAG FState;
+  bool HS1 = 0;         // State Hall Sensor 1
+  bool HS2 = 0;         // State Hall Sensor 2
+  bool Block = false;   // Block User button
+  uint8_t TableNS = 0;  // New State
+  uint8_t TableOS = 0;  // Old State
+} FState;
+// struct FLAG FState;
 
 uint8_t state = Act_OFF;
 uint8_t count = 0;
@@ -63,7 +42,7 @@ void setup()
   Serial.begin(speed);
 
   Serial.println("TableConroller");
-  Serial.printf("firmware: %s",fw);
+  Serial.printf("firmware: %s", fw);
   Serial.println();
 
   pinMode(RL1, OUTPUT);
@@ -94,76 +73,55 @@ void loop()
 
 void ButtonHandler()
 {
-  static uint8_t step_count = 0;
-  uint32_t now;
-
   btnUSER.tick();
-
   while (btnUSER.busy())
   {
     btnUSER.tick();
-
-    if (btnUSER.hasClicks(1))
+    // Block - protect by random clicks in works
+    if (btnUSER.hasClicks(1) && (FState.TableNS == NONE) && FState.Block == false)
     {
-      if (FState.Table == NONE || FState.Table == CLOSE)
+      // Change State Old and New State
+      if (FState.TableOS == OPEN)
       {
-        FState.Table = OPEN;
+        FState.TableNS = CLOSE;
+        FState.TableOS = CLOSE;
+        Serial.println("New State: CLOSE");
       }
+      else
+      {
+        FState.TableNS = OPEN;
+        FState.TableOS = OPEN;
+        Serial.println("New State: OPEN");
 
-      // stepper.setTargetDeg(360);
-      // stepper.enable();
-      // if (state != 0b00001000)
-      // {
-      //   state = 0b00001000;
-      // }
-      // else
-      //   state = 0b00000100;
-
-      // now = millis();
-      // while (millis() - now < 10000)
-      // {
-      // }
-
-      // bitClear(state, 0);
-      // bitClear(state, 1);
-    }
-
-    if (btnUSER.hasClicks(2))
-    {
-      // if (FState.Table == NONE || FState.Table == OPEN)
-      // {
-      //   FState.Table = CLOSE;
-      // }
-
-      Serial.println("ACT Down");
-      SetStateRelay(Act2_DWN);
-      SetStateRelay(Act1_DWN);
-      delay(5000);
-      SetStateRelay(Act_OFF);
+      }
     }
 
     if (btnUSER.hasClicks(3))
     {
+      Serial.println("ACT Down");
+      SetStateRelay(Act2_DWN);
+      SetStateRelay(Act1_DWN);
+      delay(TimM1);
+      SetStateRelay(Act_OFF);
     }
   }
 }
 
 void TableConroller()
 {
-  char msg[30];
-
   uint32_t now;
-
-  if (FState.Table == OPEN)
+  // Opening
+  if (FState.TableNS == OPEN && digitalRead(SEN1))
   {
+    FState.Block = true;
     Serial.println("Table Opening");
-    delay(3000);
+    delay(FD);
     Serial.println("Driver 1 UP");
     SetStateRelay(Act2_UP);
-    delay(5000);
+    delay(TimM1);
     SetStateRelay(Act_OFF);
 
-    // If Hall sensor HS1 in Start position, Start Servo
+    // If Hall sensor HS1 in HOME position, Start Servo
     if (digitalRead(SEN1))
     {
       FState.HS1 = 1;
@@ -173,7 +131,8 @@ void TableConroller()
 
       Serial.println("S1: ON");
     }
-    // If
+
+    // while Hall Sensor is not HOME position
     while (FState.HS1)
     {
       stepper.tick();
@@ -195,8 +154,9 @@ void TableConroller()
       stepper.setSpeedDeg(600);
       stepper.enable();
 
-      delay(2000);
+      delay(PD);
       now = millis();
+
       while (millis() - now < 3000)
       {
         stepper.tick();
@@ -205,13 +165,13 @@ void TableConroller()
       stepper.disable();
       stepper.stop();
       stepper.reset();
-      FState.HS2 = 0;
 
-      delay(2000);
+      delay(PD);
       Serial.println("Driver 2 UP");
 
       SetStateRelay(Act1_UP);
-      delay(6000);
+      delay(TimM2);
+      SetStateRelay(Act_OFF);
 
       stepper.setSpeedDeg(-300); // медленно крутимся НАЗАД
       stepper.enable();
@@ -221,47 +181,34 @@ void TableConroller()
         stepper.tick();
       }
 
+      FState.HS2 = 0;
+
       stepper.disable();
       stepper.stop();
       stepper.reset();
     }
-
-    FState.Table = NONE;
+    FState.TableNS = NONE;
     Serial.println("Driver OFF");
   }
-  else if (FState.Table == CLOSE)
+  else if (FState.TableNS == CLOSE && digitalRead(SEN2)) // Closing 
   {
+    FState.Block = true; // Blocked User Btn
     Serial.println("Table Closing");
-    delay(3000);
-    Serial.println("Driver 1 DWN");
-    SetStateRelay(Act2_DWN);
-    delay(10000);
-
-    if (digitalRead(SEN1))
-    {
-      sprintf(msg, "SENSOR_ 1 Activate");
-      Serial.println(msg);
-
-      Serial.println("Motor Enable");
-      stepper.setTarget(360);
-      stepper.enable();
-    }
-
+    delay(FD);
+    // If Hall sensor HS2 in HOME position, Start Servo
     if (digitalRead(SEN2))
     {
-      sprintf(msg, "SENSOR_ 2 Activate");
-      Serial.println(msg);
+      FState.HS2 = 1;
+      stepper.setAcceleration(300);
+      stepper.setSpeedDeg(800);
+      stepper.enable();
+      Serial.println("S2: ON");
     }
-    Serial.println("Driver 2 DWN");
-    SetStateRelay(Act1_DWN);
-    delay(10000);
-
-    FState.Table = NONE;
-    Serial.println("Driver OFF");
   }
   else
   {
-    FState.Table = NONE;
+    FState.TableNS = NONE;
+    FState.Block = false;
 
     stepper.disable();
     stepper.stop();
