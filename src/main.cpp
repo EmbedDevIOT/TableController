@@ -6,17 +6,17 @@
 #define speed 115200
 
 Button btnUSER(BTN, INPUT_PULLUP);
-GStepper<STEPPER2WIRE> stepper(1600, PUL, DIR, ENA); // драйвер step-dir + пин enable
+GStepper<STEPPER2WIRE> stepper(1600, PUL, DIR, ENA); 
 
 String fw = "0.7";
 
 enum ActState
 {
-  Act_OFF = 0b00000000,
-  Act1_UP = 0b00000001,
-  Act1_DWN = 0b00000010,
-  Act2_UP = 0b00000100,
-  Act2_DWN = 0b00001000
+  Act_OFF   = 0b00000000,
+  Act1_UP   = 0b00000001,
+  Act1_DWN  = 0b00000010,
+  Act2_UP   = 0b00000100,
+  Act2_DWN  = 0b00001000
 };
 
 struct FLAG
@@ -25,7 +25,6 @@ struct FLAG
   bool HS2 = 0;            // State Hall Sensor 2
   bool Block = false;      // Block User button
   uint8_t TableNS = 0;     // New State
-  uint8_t TableOS = CLOSE; // Old State
 } FState;
 // struct FLAG FState;
 
@@ -84,14 +83,12 @@ void ButtonHandler()
       if (digitalRead(SEN2))
       {
         FState.TableNS = CLOSE;
-        FState.TableOS = CLOSE;
-        Serial.println("New State: CLOSE");
+        Serial.println("State: CLOSE");
       }
       else if (digitalRead(SEN1))
       {
         FState.TableNS = OPEN;
-        FState.TableOS = OPEN;
-        Serial.println("New State: OPEN");
+        Serial.println("State: OPEN");
       }
     }
 
