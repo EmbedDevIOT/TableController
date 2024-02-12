@@ -3,6 +3,8 @@
 #include <GyverStepper.h>
 
 #define speed 115200
+#define TimM1 10000
+#define TimM2 7000
 
 #define ENA 12
 #define DIR 14
@@ -20,10 +22,7 @@
 Button btnUSER(BTN, INPUT_PULLUP);
 GStepper<STEPPER2WIRE> stepper(1600, PUL, DIR, ENA); // драйвер step-dir + пин enable
 
-String fw = "0.4";
-
-uint8_t state = 0b00000000;
-uint8_t count = 0;
+String fw = "0.5";
 
 enum state
 {
@@ -49,8 +48,10 @@ struct FLAG
   bool HS2 = 0;
   uint8_t Table = 0;
 };
-
 struct FLAG FState;
+
+uint8_t state = Act_OFF;
+uint8_t count = 0;
 
 void SetStateRelay(uint8_t st);
 void ButtonHandler();
@@ -60,7 +61,10 @@ void task_1000();
 void setup()
 {
   Serial.begin(speed);
+
   Serial.println("TableConroller");
+  Serial.printf("firmware: %s",fw);
+  Serial.println();
 
   pinMode(RL1, OUTPUT);
   digitalWrite(RL1, HIGH);
@@ -79,37 +83,10 @@ void setup()
   stepper.disable();
   stepper.stop();
   stepper.reset();
-
-  // stepper.setTarget(360);
 }
 
 void loop()
 {
-  if (digitalRead(SEN1))
-  {
-    FState.HS1 = 1;
-    stepper.setAcceleration(300);
-    stepper.setSpeedDeg(600);
-    stepper.enable();
-    // stepper.setMaxSpeed(800);
-
-    Serial.println("S1: ON");
-  }
-
-  while (FState.HS1)
-  {
-    stepper.tick();
-
-    if (digitalRead(SEN2))
-    {
-      Serial.println("S2: ON");
-      FState.HS1 = 0;
-      stepper.disable();
-      stepper.stop();
-      stepper.reset();
-    }
-  }
-
   ButtonHandler();
   TableConroller();
   task_1000();
@@ -153,13 +130,16 @@ void ButtonHandler()
 
     if (btnUSER.hasClicks(2))
     {
-      if (FState.Table == NONE || FState.Table == OPEN)
-      {
-        FState.Table = CLOSE;
-      }
-      // Serial.println("RL 1 ON RL 2 OFF");
-      // bitSet(state, 0);
-      // bitClear(state, 1);
+      // if (FState.Table == NONE || FState.Table == OPEN)
+      // {
+      //   FState.Table = CLOSE;
+      // }
+
+      Serial.println("ACT Down");
+      SetStateRelay(Act2_DWN);
+      SetStateRelay(Act1_DWN);
+      delay(5000);
+      SetStateRelay(Act_OFF);
     }
 
     if (btnUSER.hasClicks(3))
@@ -168,23 +148,11 @@ void ButtonHandler()
   }
 }
 
-void task_1000()
-{
-  static uint32_t timer_1000 = 0;
-
-  char msg[30];
-
-  if (millis() - timer_1000 > 1000)
-  {
-    timer_1000 = millis();
-    sprintf(msg, "T: 1000");
-    Serial.println(msg);
-  }
-}
-
 void TableConroller()
 {
   char msg[30];
+
+  uint32_t now;
 
   if (FState.Table == OPEN)
   {
@@ -192,26 +160,71 @@ void TableConroller()
     delay(3000);
     Serial.println("Driver 1 UP");
     SetStateRelay(Act2_UP);
-    delay(10000);
+    delay(5000);
+    SetStateRelay(Act_OFF);
 
+    // If Hall sensor HS1 in Start position, Start Servo
     if (digitalRead(SEN1))
     {
-      sprintf(msg, "SENSOR_ 1 Activate");
-      Serial.println(msg);
-
-      Serial.println("Motor Enable");
-      stepper.setTarget(360);
+      FState.HS1 = 1;
+      stepper.setAcceleration(300);
+      stepper.setSpeedDeg(800);
       stepper.enable();
+
+      Serial.println("S1: ON");
+    }
+    // If
+    while (FState.HS1)
+    {
+      stepper.tick();
+
+      if (digitalRead(SEN2))
+      {
+        Serial.println("S2: ON");
+        FState.HS1 = 0;
+        FState.HS2 = 1;
+        stepper.disable();
+        stepper.stop();
+        stepper.reset();
+      }
     }
 
-    if (digitalRead(SEN2))
+    if (FState.HS2)
     {
-      sprintf(msg, "SENSOR_ 2 Activate");
-      Serial.println(msg);
+      stepper.setAcceleration(300);
+      stepper.setSpeedDeg(600);
+      stepper.enable();
+
+      delay(2000);
+      now = millis();
+      while (millis() - now < 3000)
+      {
+        stepper.tick();
+      }
+
+      stepper.disable();
+      stepper.stop();
+      stepper.reset();
+      FState.HS2 = 0;
+
+      delay(2000);
+      Serial.println("Driver 2 UP");
+
+      SetStateRelay(Act1_UP);
+      delay(6000);
+
+      stepper.setSpeedDeg(-300); // медленно крутимся НАЗАД
+      stepper.enable();
+
+      while (!digitalRead(SEN2))
+      {
+        stepper.tick();
+      }
+
+      stepper.disable();
+      stepper.stop();
+      stepper.reset();
     }
-    Serial.println("Driver 2 UP");
-    SetStateRelay(Act1_UP);
-    delay(10000);
 
     FState.Table = NONE;
     Serial.println("Driver OFF");
@@ -286,5 +299,19 @@ void SetStateRelay(uint8_t st)
     digitalWrite(RL4, LOW);
   default:
     break;
+  }
+}
+
+void task_1000()
+{
+  static uint32_t timer_1000 = 0;
+
+  char msg[30];
+
+  if (millis() - timer_1000 > 1000)
+  {
+    timer_1000 = millis();
+    sprintf(msg, "T: 1000");
+    Serial.println(msg);
   }
 }
