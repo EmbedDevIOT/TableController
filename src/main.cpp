@@ -21,11 +21,11 @@ enum ActState
 
 struct FLAG
 {
-  bool HS1 = 0;         // State Hall Sensor 1
-  bool HS2 = 0;         // State Hall Sensor 2
-  bool Block = false;   // Block User button
-  uint8_t TableNS = 0;  // New State
-  uint8_t TableOS = 0;  // Old State
+  bool HS1 = 0;            // State Hall Sensor 1
+  bool HS2 = 0;            // State Hall Sensor 2
+  bool Block = false;      // Block User button
+  uint8_t TableNS = 0;     // New State
+  uint8_t TableOS = CLOSE; // Old State
 } FState;
 // struct FLAG FState;
 
@@ -33,6 +33,7 @@ uint8_t state = Act_OFF;
 uint8_t count = 0;
 
 void SetStateRelay(uint8_t st);
+void SetStateDrive(uint8_t state);
 void ButtonHandler();
 void TableConroller();
 void task_1000();
@@ -59,9 +60,7 @@ void setup()
 
   stepper.setRunMode(KEEP_SPEED);
 
-  stepper.disable();
-  stepper.stop();
-  stepper.reset();
+  SetStateDrive(disable);
 }
 
 void loop()
@@ -74,6 +73,7 @@ void loop()
 void ButtonHandler()
 {
   btnUSER.tick();
+
   while (btnUSER.busy())
   {
     btnUSER.tick();
@@ -81,18 +81,17 @@ void ButtonHandler()
     if (btnUSER.hasClicks(1) && (FState.TableNS == NONE) && FState.Block == false)
     {
       // Change State Old and New State
-      if (FState.TableOS == OPEN)
+      if (digitalRead(SEN2))
       {
         FState.TableNS = CLOSE;
         FState.TableOS = CLOSE;
         Serial.println("New State: CLOSE");
       }
-      else
+      else if (digitalRead(SEN1))
       {
         FState.TableNS = OPEN;
         FState.TableOS = OPEN;
         Serial.println("New State: OPEN");
-
       }
     }
 
@@ -114,18 +113,20 @@ void TableConroller()
   if (FState.TableNS == OPEN && digitalRead(SEN1))
   {
     FState.Block = true;
-    Serial.println("Table Opening");
+    Serial.println("Table Opening Starting..");
+    // First delay waiting (3s) item 2
     delay(FD);
-    Serial.println("Driver 1 UP");
+    Serial.println("Driver 1-3 UP");
+    // Three drivers moving Forward (item 3)
     SetStateRelay(Act2_UP);
     delay(TimM1);
     SetStateRelay(Act_OFF);
 
-    // If Hall sensor HS1 in HOME position, Start Servo
+    // If Hall sensor HS1 in HOME position, Start Servo (item 4)
     if (digitalRead(SEN1))
     {
       FState.HS1 = 1;
-      stepper.setAcceleration(300);
+      stepper.setAcceleration(3000);
       stepper.setSpeedDeg(800);
       stepper.enable();
 
@@ -147,74 +148,129 @@ void TableConroller()
         stepper.reset();
       }
     }
-
+    // Started, if 2 Hall sensor in Home Position
     if (FState.HS2)
     {
-      stepper.setAcceleration(300);
-      stepper.setSpeedDeg(600);
+      stepper.setAcceleration(3000);
+      stepper.setSpeedDeg(800);
       stepper.enable();
 
       delay(PD);
       now = millis();
-
+      // Moved slightfly to forward (item 5)
       while (millis() - now < 3000)
       {
         stepper.tick();
       }
-
-      stepper.disable();
-      stepper.stop();
-      stepper.reset();
-
+      
+      SetStateDrive(disable);
+      // Moved Four Driver (Item 4)
       delay(PD);
-      Serial.println("Driver 2 UP");
-
+      Serial.println("Driver 4 UP");
       SetStateRelay(Act1_UP);
       delay(TimM2);
       SetStateRelay(Act_OFF);
 
-      stepper.setSpeedDeg(-300); // медленно крутимся НАЗАД
+      // while Hall Sensor is not HOME position (item 7)
+      stepper.setSpeedDeg(-800);
       stepper.enable();
-
       while (!digitalRead(SEN2))
       {
         stepper.tick();
       }
-
       FState.HS2 = 0;
 
-      stepper.disable();
-      stepper.stop();
-      stepper.reset();
+      SetStateDrive(disable);
     }
     FState.TableNS = NONE;
     Serial.println("Driver OFF");
+    Serial.println("Table Opening Compleated.");
   }
-  else if (FState.TableNS == CLOSE && digitalRead(SEN2)) // Closing 
+  else if (FState.TableNS == CLOSE && digitalRead(SEN2)) // Closing
   {
     FState.Block = true; // Blocked User Btn
-    Serial.println("Table Closing");
+    Serial.println("Table Closing Starting");
+    // First delay waiting (3s) p.2
     delay(FD);
     // If Hall sensor HS2 in HOME position, Start Servo
     if (digitalRead(SEN2))
     {
       FState.HS2 = 1;
-      stepper.setAcceleration(300);
+      stepper.setAcceleration(3000);
       stepper.setSpeedDeg(800);
       stepper.enable();
       Serial.println("S2: ON");
+
+      now = millis();
+      // The motor Nema 23 moves slightly forward
+      while (millis() - now < 3000)
+      {
+        stepper.tick();
+      }
     }
+
+    FState.HS2 = 0;
+
+    SetStateDrive(disable);
+
+    delay(PD);
+    Serial.println("Driver 4 Down");
+    SetStateRelay(Act1_DWN);
+    delay(TimM2);
+    SetStateRelay(Act_OFF);
+
+    while (!digitalRead(SEN2))
+    {
+      stepper.tick();
+    }
+
+    FState.TableNS = NONE;
+    Serial.println("Driver OFF");
+    Serial.println("Table Closing Compleated.");
   }
   else
   {
     FState.TableNS = NONE;
     FState.Block = false;
 
+    SetStateDrive(disable);
+    SetStateRelay(Act_OFF);
+  }
+}
+
+void SetStateDrive(uint8_t state)
+{
+  switch (state)
+  {
+  case disable:
     stepper.disable();
     stepper.stop();
     stepper.reset();
+    break;
+  case enable:
+    /* code */
+    break;
+  case back:
+    /* code */
+    break;
+  case forward:
+    /* code */
+    break;
+  default:
+    break;
+  }
+}
+void task_1000()
+{
+  static uint32_t timer_1000 = 0;
 
-    SetStateRelay(Act_OFF);
+  char msg[30];
+
+  if (millis() - timer_1000 > 1000)
+  {
+    timer_1000 = millis();
+    sprintf(msg, "T: 1000");
+    Serial.println(msg);
   }
 }
 
@@ -246,19 +302,5 @@ void SetStateRelay(uint8_t st)
     digitalWrite(RL4, LOW);
   default:
     break;
-  }
-}
-
-void task_1000()
-{
-  static uint32_t timer_1000 = 0;
-
-  char msg[30];
-
-  if (millis() - timer_1000 > 1000)
-  {
-    timer_1000 = millis();
-    sprintf(msg, "T: 1000");
-    Serial.println(msg);
   }
 }

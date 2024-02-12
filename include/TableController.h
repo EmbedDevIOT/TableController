@@ -4,6 +4,7 @@
 
 #include <Arduino.h>
 
+
 #define FD 3000
 #define PD 2000
 #define TimM1 10000
@@ -13,6 +14,14 @@ enum PWR
 {
   OFF = 0,
   ON
+};
+
+enum Drive
+{
+  disable,
+  enable,
+  forward,
+  back
 };
 
 enum state
@@ -35,12 +44,16 @@ enum state
 #define SEN1 32
 #define SEN2 35
 
-class Table{
-    public:
-    Table(byte);
-    SetState(uint8_t state);
-    private:
+// class Table{
+//     public:
+//     Table(byte);
+//     SetState(uint8_t state);
+//     private:
+//     SetRotation();
+//     SetSpeed();
+//     uint8_t speed = 800;
+//     
 
-}
+// }
 
 // #endif 
