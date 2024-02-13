@@ -21,6 +21,8 @@ enum Drive
   disable,
   enable,
   forward,
+  forw_5RPM,
+  forw_8RPM,
   back
 };
 
@@ -28,7 +30,8 @@ enum state
 {
   NONE,
   OPEN,
-  CLOSE
+  CLOSE,
+  HOME
 };
 
 #define ENA 12

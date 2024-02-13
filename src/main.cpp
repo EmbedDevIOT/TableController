@@ -6,30 +6,29 @@
 #define speed 115200
 
 Button btnUSER(BTN, INPUT_PULLUP);
-GStepper<STEPPER2WIRE> stepper(1600, PUL, DIR, ENA); 
+GStepper<STEPPER2WIRE> stepper(1600, PUL, DIR, ENA);
 
-String fw = "0.7";
+String fw = "0.8";
 
 enum ActState
 {
-  Act_OFF   = 0b00000000,
-  Act1_UP   = 0b00000001,
-  Act1_DWN  = 0b00000010,
-  Act2_UP   = 0b00000100,
-  Act2_DWN  = 0b00001000
+  Act_OFF = 0b00000000,
+  Act1_UP = 0b00000001,
+  Act1_DWN = 0b00000010,
+  Act2_UP = 0b00000100,
+  Act2_DWN = 0b00001000
 };
 
 struct FLAG
 {
-  bool HS1 = 0;            // State Hall Sensor 1
-  bool HS2 = 0;            // State Hall Sensor 2
-  bool Block = false;      // Block User button
-  uint8_t TableNS = 0;     // New State
+  bool HS1 = 0;        // State Hall Sensor 1
+  bool HS2 = 0;        // State Hall Sensor 2
+  bool Block = false;  // Block User button
+  uint8_t TableNS = 0; // New State
 } FState;
 // struct FLAG FState;
 
 uint8_t state = Act_OFF;
-uint8_t count = 0;
 
 void SetStateRelay(uint8_t st);
 void SetStateDrive(uint8_t state);
@@ -60,6 +59,7 @@ void setup()
   stepper.setRunMode(KEEP_SPEED);
 
   SetStateDrive(disable);
+  btnUSER.setStepTimeout(1000);
 }
 
 void loop()
@@ -71,11 +71,22 @@ void loop()
 
 void ButtonHandler()
 {
-  btnUSER.tick();
+  uint16_t value = 0;
 
+  btnUSER.tick();
   while (btnUSER.busy())
   {
     btnUSER.tick();
+
+    if (btnUSER.step())
+    {      
+      value++; 
+      if (value >= 4)
+      {
+        Serial.println("State: GO HOME");
+        FState.TableNS = HOME;
+      }
+    }
     // Block - protect by random clicks in works
     if (btnUSER.hasClicks(1) && (FState.TableNS == NONE) && FState.Block == false)
     {
@@ -94,11 +105,21 @@ void ButtonHandler()
 
     if (btnUSER.hasClicks(3))
     {
-      Serial.println("ACT Down");
-      SetStateRelay(Act2_DWN);
-      SetStateRelay(Act1_DWN);
-      delay(TimM1);
-      SetStateRelay(Act_OFF);
+      SetStateDrive(forw_8RPM);
+      uint32_t now;
+      now = millis();
+      // Moved slightfly to forward (item 5)
+      while (millis() - now < 13000)
+      {
+        stepper.tick();
+      }
+      SetStateDrive(disable);
+
+      // Serial.println("ACT Down");
+      // SetStateRelay(Act2_DWN);
+      // SetStateRelay(Act1_DWN);
+      // delay(TimM1);
+      // SetStateRelay(Act_OFF);
     }
   }
 }
@@ -143,12 +164,13 @@ void TableConroller()
     // Started, if 2 Hall sensor in Home Position
     if (FState.HS2)
     {
-      SetStateDrive(forward);
+      SetStateDrive(forw_5RPM);
 
       delay(PD);
+
       now = millis();
       // Moved slightfly to forward (item 5)
-      while (millis() - now < 3000)
+      while (millis() - now < 5000)
       {
         stepper.tick();
       }
@@ -177,7 +199,7 @@ void TableConroller()
     Serial.println("Table Opening Compleated.");
   }
   // Closing
-  else if (FState.TableNS == CLOSE && digitalRead(SEN2)) 
+  else if (FState.TableNS == CLOSE && digitalRead(SEN2))
   {
     FState.Block = true; // Blocked User Btn
     Serial.println("Table Closing Starting");
@@ -188,13 +210,14 @@ void TableConroller()
     {
       Serial.println("S2: ON");
       FState.HS2 = 1;
-      SetStateDrive(forward);
+
+      SetStateDrive(forw_5RPM);
     }
     if (FState.HS2)
     {
       now = millis();
       // Item 3. The motor Nema 23 moves slightly forward
-      while (millis() - now < 3000)
+      while (millis() - now < 5000)
       {
         stepper.tick();
       }
@@ -209,13 +232,13 @@ void TableConroller()
     SetStateRelay(Act1_DWN);
     delay(TimM2);
     SetStateRelay(Act_OFF);
-    // Item 5. The driver Nema 23 moves slightly backward
+    // Item 5. The driver Nema 23 moves backward
     SetStateDrive(back);
     while (!digitalRead(SEN2))
     {
       stepper.tick();
     }
-    // Item 6. Driver Nema 23 moves slightly backward to HAll sensor 1
+    // Item 6. Driver Nema 23 moves backward to HAll sensor 1
     while (!digitalRead(SEN1))
     {
       stepper.tick();
@@ -255,14 +278,30 @@ void SetStateDrive(uint8_t state)
   case enable:
     /* code */
     break;
-  case back:
+  case forward:
+    stepper.setRunMode(KEEP_SPEED);
     stepper.setAcceleration(3000);
     stepper.setSpeedDeg(-800);
     stepper.enable();
     break;
-  case forward:
+  case back:
+    stepper.setRunMode(KEEP_SPEED);
     stepper.setAcceleration(3000);
     stepper.setSpeedDeg(800);
+    stepper.enable();
+    break;
+  case forw_5RPM:
+    stepper.setRunMode(FOLLOW_POS);
+    stepper.setMaxSpeed(3000);
+    stepper.setAcceleration(3000);
+    stepper.setTargetDeg(-360 * 5, RELATIVE);
+    stepper.enable();
+    break;
+  case forw_8RPM:
+    stepper.setRunMode(FOLLOW_POS);
+    stepper.setMaxSpeed(3000);
+    stepper.setAcceleration(3000);
+    stepper.setTargetDeg(-360 * 8, RELATIVE);
     stepper.enable();
     break;
   default:
@@ -294,6 +333,11 @@ void SetStateRelay(uint8_t st)
     digitalWrite(RL4, HIGH);
     break;
   case 0b00001000:
+    digitalWrite(RL3, HIGH);
+    digitalWrite(RL4, LOW);
+    break;
+
+  case 0b11111111:
     digitalWrite(RL3, HIGH);
     digitalWrite(RL4, LOW);
   default:
