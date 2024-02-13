@@ -8,7 +8,7 @@
 Button btnUSER(BTN, INPUT_PULLUP);
 GStepper<STEPPER2WIRE> stepper(1600, PUL, DIR, ENA);
 
-String fw = "0.8";
+String fw = "1.0";
 
 enum ActState
 {
@@ -72,6 +72,7 @@ void loop()
 void ButtonHandler()
 {
   uint16_t value = 0;
+  static bool btnst = false;
 
   btnUSER.tick();
   while (btnUSER.busy())
@@ -86,6 +87,8 @@ void ButtonHandler()
       {
         Serial.println("State: GO HOME");
         FState.TableNS = HOME;
+        FState.Block = true;
+        break;
       }
     }
     // Block - protect by random clicks in works
@@ -108,11 +111,22 @@ void ButtonHandler()
     {
       SetStateDrive(disable);
 
-      Serial.println("ACT Down");
-      SetStateRelay(Act2_DWN);
-      SetStateRelay(Act1_DWN);
+      if (btnst)
+      {
+        Serial.println("Actuators UP");
+        SetStateRelay(Act2_UP);
+        SetStateRelay(Act1_UP);
+      }
+      else
+      {
+        Serial.println("Actuators DWN");
+
+        SetStateRelay(Act2_DWN);
+        SetStateRelay(Act1_DWN);
+      }
       delay(TimM1);
       SetStateRelay(Act_OFF);
+      btnst = !btnst; 
     }
   }
 }
@@ -194,6 +208,7 @@ void TableConroller()
   // Closing
   else if (FState.TableNS == CLOSE && digitalRead(SEN2))
   {
+
     FState.Block = true; // Blocked User Btn
     Serial.println("Table Closing Starting");
     // Item 2. First delay waiting (3s)
@@ -251,6 +266,8 @@ void TableConroller()
   }
   else if (FState.TableNS == HOME)
   {
+    uint8_t pST = 0; // variable for change action programs
+
     Serial.println("Table GO HOME.. ");
 
     FState.Block = true;
@@ -260,24 +277,105 @@ void TableConroller()
     SetStateRelay(Act2_DWN);
     delay(TimM1);
     SetStateRelay(Act_OFF);
-    // 
+    // Item 2. Nema 23 Driver moved backward to 8 RPM
     SetStateDrive(back_8RPM);
-
+    // Check sensors enable
     now = millis();
     while (millis() - now < 12000)
     {
       stepper.tick();
+
       if (digitalRead(SEN2))
       {
         Serial.println("S2: ON");
+        pST = 2;
         SetStateDrive(disable);
         break;
       }
+      else if (digitalRead(SEN1))
+      {
+        Serial.println("S1: ON");
+        SetStateDrive(disable);
+        pST = 1;
+        break;
+      }
+      else
+        pST = 0;
     }
     Serial.println("While END");
-    #error
-    SetStateDrive(disable);
+    delay(1000);
 
+    switch (pST)
+    {
+    case 0: // Item 3B
+      Serial.println("action 0");
+      // Moved Four Driver.
+      Serial.println("Driver 4 Down");
+      SetStateRelay(Act1_DWN);
+      delay(TimM2);
+      SetStateRelay(Act_OFF);
+      SetStateDrive(back);
+
+      while (!digitalRead(SEN1))
+      {
+        stepper.tick();
+      }
+      SetStateDrive(disable);
+
+      Serial.println("Driver 1-3 UP");
+      // Three drivers moving Forward
+      SetStateRelay(Act2_UP);
+      delay(TimM1);
+      SetStateRelay(Act_OFF);
+      Serial.println("action 0 stop");
+
+      break;
+    case 1:
+      Serial.println("action 1 start");
+      Serial.println("Driver 1-3 UP");
+      // Three drivers moving Forward
+      SetStateRelay(Act2_UP);
+      delay(TimM1);
+      SetStateRelay(Act_OFF);
+      Serial.println("Driver 4 Down");
+      SetStateRelay(Act1_DWN);
+      delay(TimM2);
+      SetStateRelay(Act_OFF);
+      Serial.println("action 2 stop");
+      break;
+    case 2: // Item 3A
+      Serial.println("action 2 start");
+      SetStateDrive(forw_5RPM);
+
+      now = millis();
+      while (millis() - now < 5000)
+      {
+        stepper.tick();
+      }
+      SetStateDrive(disable);
+      // Moved Four Driver.
+      Serial.println("Driver 4 Down");
+      SetStateRelay(Act1_DWN);
+      delay(TimM2);
+      SetStateRelay(Act_OFF);
+      SetStateDrive(back);
+      while (!digitalRead(SEN1))
+      {
+        stepper.tick();
+      }
+      SetStateDrive(disable);
+      Serial.println("Driver 1-3 UP");
+      // Three drivers moving Forward
+      SetStateRelay(Act2_UP);
+      delay(TimM1);
+      SetStateRelay(Act_OFF);
+      Serial.println("action 2 stop");
+      break;
+
+    default:
+      break;
+    }
+    pST = 0;
     FState.TableNS = NONE;
     Serial.println("Driver OFF");
     Serial.println("Table GO HOME Compleated.");
