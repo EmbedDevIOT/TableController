@@ -9,7 +9,7 @@
      
   3. Опрос и анализ 2х датчиков Холла
      
-  4. Многофункциональная кнопка.
+  4. Управление одной кнопкой.
   </details>
   
  ![photo_2024-02-13_23-40-41](https://github.com/EmbedDevIOT/TableController/assets/99679510/4ada62db-3c6c-4a80-91cf-7c9277b295ff) 
