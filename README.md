@@ -11,4 +11,16 @@
      
   4. Многофункциональная кнопка.
   </details>
-<!-- ![photo_2024-02-13_23-40-41](https://github.com/EmbedDevIOT/TableController/assets/99679510/4ada62db-3c6c-4a80-91cf-7c9277b295ff) -->
+  
+ ![photo_2024-02-13_23-40-41](https://github.com/EmbedDevIOT/TableController/assets/99679510/4ada62db-3c6c-4a80-91cf-7c9277b295ff) 
+
+## Устройство включает в себя
+* MCU ESP-wroom-32
+* Driver TB6600
+* 4CH relay module
+* 2 Hall sensors (NPN)
+* DCDC Step Down 12 - 5V
+* LiOn battery
+* User Button
+* Linear driver
+* Step Driver Nema 23
