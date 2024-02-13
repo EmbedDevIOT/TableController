@@ -22,7 +22,7 @@ enum Drive
   enable,
   forward,
   forw_5RPM,
-  forw_8RPM,
+  back_8RPM,
   back
 };
 

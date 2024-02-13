@@ -78,9 +78,10 @@ void ButtonHandler()
   {
     btnUSER.tick();
 
-    if (btnUSER.step())
-    {      
-      value++; 
+    if (btnUSER.step() && FState.Block == false)
+    {
+      value++;
+
       if (value >= 4)
       {
         Serial.println("State: GO HOME");
@@ -105,21 +106,13 @@ void ButtonHandler()
 
     if (btnUSER.hasClicks(3))
     {
-      SetStateDrive(forw_8RPM);
-      uint32_t now;
-      now = millis();
-      // Moved slightfly to forward (item 5)
-      while (millis() - now < 13000)
-      {
-        stepper.tick();
-      }
       SetStateDrive(disable);
 
-      // Serial.println("ACT Down");
-      // SetStateRelay(Act2_DWN);
-      // SetStateRelay(Act1_DWN);
-      // delay(TimM1);
-      // SetStateRelay(Act_OFF);
+      Serial.println("ACT Down");
+      SetStateRelay(Act2_DWN);
+      SetStateRelay(Act1_DWN);
+      delay(TimM1);
+      SetStateRelay(Act_OFF);
     }
   }
 }
@@ -256,7 +249,40 @@ void TableConroller()
     Serial.println("Driver OFF");
     Serial.println("Table Closing Compleated.");
   }
-  // Disable
+  else if (FState.TableNS == HOME)
+  {
+    Serial.println("Table GO HOME.. ");
+
+    FState.Block = true;
+    // Item 1. Three Drivers run
+    Serial.println("Driver 1-3 DWN");
+    // Three drivers moving Forward (item 1)
+    SetStateRelay(Act2_DWN);
+    delay(TimM1);
+    SetStateRelay(Act_OFF);
+
+    SetStateDrive(back_8RPM);
+
+    now = millis();
+    while (millis() - now < 12000)
+    {
+      stepper.tick();
+      if (digitalRead(SEN2))
+      {
+        Serial.println("S2: ON");
+        SetStateDrive(disable);
+        return;
+      }
+    }
+    Serial.println("While END");
+    #error
+    SetStateDrive(disable);
+
+    FState.TableNS = NONE;
+    Serial.println("Driver OFF");
+    Serial.println("Table GO HOME Compleated.");
+  }
+  // All Disable
   else
   {
     FState.TableNS = NONE;
@@ -297,11 +323,11 @@ void SetStateDrive(uint8_t state)
     stepper.setTargetDeg(-360 * 5, RELATIVE);
     stepper.enable();
     break;
-  case forw_8RPM:
+  case back_8RPM:
     stepper.setRunMode(FOLLOW_POS);
     stepper.setMaxSpeed(3000);
     stepper.setAcceleration(3000);
-    stepper.setTargetDeg(-360 * 8, RELATIVE);
+    stepper.setTargetDeg(360 * 8, RELATIVE);
     stepper.enable();
     break;
   default:
