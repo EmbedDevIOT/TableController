@@ -260,7 +260,7 @@ void TableConroller()
     SetStateRelay(Act2_DWN);
     delay(TimM1);
     SetStateRelay(Act_OFF);
-
+    // 
     SetStateDrive(back_8RPM);
 
     now = millis();
@@ -271,7 +271,7 @@ void TableConroller()
       {
         Serial.println("S2: ON");
         SetStateDrive(disable);
-        return;
+        break;
       }
     }
     Serial.println("While END");

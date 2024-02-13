@@ -33,18 +33,3 @@
 3В. если появился сигнал от датчика 1 - три актуатора поднимаются. Актуатор 4 втягивается.
 
 Вращение по часовой стрелке
-
-      stepper.setRunMode(FOLLOW_POS);
-      stepper.setMaxSpeed(-3000);
-      stepper.setAcceleration(3000);
-      // stepper.setSpeedDeg(-800);
-      // stepper.enable();
-      stepper.setTargetDeg(360*5, RELATIVE);
-      uint32_t now;
-      now = millis();
-      // Moved slightfly to forward (item 5)
-      while (millis() - now < 10000)
-      {
-        stepper.tick();
-      }
-      SetStateDrive(disable);
