@@ -1,5 +1,11 @@
 # Table Controller ESP32 
-## IoT контроллер управления механикой стола. на базе контроллера Espressif
+## IoT контроллер управления механикой стола.
+
+## Software:
+* Visual Studio Code
+* PlatformIO
+* Arduino Framework
+  
 <details>
 <summary>Что умеет устройство?</summary>
   
