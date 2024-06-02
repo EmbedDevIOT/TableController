@@ -15,8 +15,8 @@ enum ActState
   Act_OFF = 0b00000000,
   Act1_UP = 0b00000001,
   Act1_DWN = 0b00000010,
-  Act2_UP = 0b00000100,
-  Act2_DWN = 0b00001000
+  Act2_UP  = 0b00001000,
+  Act2_DWN = 0b00000100
 };
 
 struct FLAG
@@ -115,14 +115,14 @@ void ButtonHandler()
       {
         Serial.println("Actuators UP");
         SetStateRelay(Act2_UP);
-        SetStateRelay(Act1_UP);
+        // SetStateRelay(Act1_UP); // center
       }
       else
       {
         Serial.println("Actuators DWN");
 
         SetStateRelay(Act2_DWN);
-        SetStateRelay(Act1_DWN);
+        // SetStateRelay(Act1_DWN);
       }
       delay(TimM1);
       SetStateRelay(Act_OFF);
@@ -405,27 +405,27 @@ void SetStateDrive(uint8_t state)
   case forward:
     stepper.setRunMode(KEEP_SPEED);
     stepper.setAcceleration(3000);
-    stepper.setSpeedDeg(-800);
+    stepper.setSpeedDeg(-1600); //800
     stepper.enable();
     break;
   case back:
     stepper.setRunMode(KEEP_SPEED);
     stepper.setAcceleration(3000);
-    stepper.setSpeedDeg(800);
+    stepper.setSpeedDeg(1600); //800
     stepper.enable();
     break;
   case forw_5RPM:
     stepper.setRunMode(FOLLOW_POS);
     stepper.setMaxSpeed(3000);
     stepper.setAcceleration(3000);
-    stepper.setTargetDeg(-360 * 5, RELATIVE);
+    stepper.setTargetDeg(-360 * 10, RELATIVE);
     stepper.enable();
     break;
   case back_8RPM:
     stepper.setRunMode(FOLLOW_POS);
     stepper.setMaxSpeed(3000);
     stepper.setAcceleration(3000);
-    stepper.setTargetDeg(360 * 8, RELATIVE);
+    stepper.setTargetDeg(360 * 10, RELATIVE);
     stepper.enable();
     break;
   default:

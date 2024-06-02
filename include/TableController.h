@@ -5,7 +5,7 @@
 #include <Arduino.h>
 
 
-#define FD 3000
+#define FD 1000
 #define PD 2000
 #define TimM1 10000
 #define TimM2 7000
